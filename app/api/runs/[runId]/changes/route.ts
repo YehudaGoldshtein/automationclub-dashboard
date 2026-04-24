@@ -78,8 +78,6 @@ export async function GET(
   const storeBySku = new Map<string, (typeof storeRows)[number]>();
   for (const s of storeRows) storeBySku.set(s.sku, s);
 
-  const isAdmin = session.user.role === "admin";
-
   return NextResponse.json({
     runId,
     customerId: run.customerId,
@@ -88,8 +86,10 @@ export async function GET(
       const s = storeBySku.get(c.sku);
       const storefrontUrl =
         s?.handle && storeUrl ? `${storeUrl}/products/${s.handle}` : null;
+      // Customer users are typically the store owner — Shopify re-gates the
+      // actual admin access, so surfacing the link is safe and handy.
       const adminUrl =
-        isAdmin && s?.storeProductId && myshopify
+        s?.storeProductId && myshopify
           ? `https://${myshopify}/admin/products/${s.storeProductId}`
           : null;
       return {
