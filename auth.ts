@@ -4,6 +4,7 @@ import { compare } from "bcryptjs";
 import { eq } from "drizzle-orm";
 
 import { db, users } from "@/lib/db";
+import { log } from "@/lib/log";
 
 declare module "next-auth" {
   interface User {
@@ -34,14 +35,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         const email = typeof credentials?.email === "string" ? credentials.email.toLowerCase().trim() : "";
         const password = typeof credentials?.password === "string" ? credentials.password : "";
-        if (!email || !password) return null;
+        if (!email || !password) {
+          log.warn("login_bad_form", { email_present: !!email });
+          return null;
+        }
 
         const [row] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-        if (!row) return null;
+        if (!row) {
+          log.warn("login_unknown_email", { email });
+          return null;
+        }
 
         const ok = await compare(password, row.passwordHash);
-        if (!ok) return null;
+        if (!ok) {
+          log.warn("login_bad_password", { email });
+          return null;
+        }
 
+        log.info("login_ok", { email, role: row.role, customer_id: row.customerId });
         return {
           id: row.id,
           email: row.email,

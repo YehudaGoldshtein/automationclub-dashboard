@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 
 import { requireSession } from "@/lib/auth-helpers";
+import { log } from "@/lib/log";
 import {
   customers,
   db,
@@ -26,9 +27,18 @@ export async function GET(
     .where(eq(syncRuns.runId, runId))
     .limit(1);
 
-  if (!run) return new NextResponse("not found", { status: 404 });
+  if (!run) {
+    log.warn("run_changes_not_found", { run_id: runId, email: session.user.email });
+    return new NextResponse("not found", { status: 404 });
+  }
 
   if (session.user.role !== "admin" && run.customerId !== session.user.customerId) {
+    log.warn("run_changes_forbidden", {
+      run_id: runId,
+      email: session.user.email,
+      own: session.user.customerId,
+      target: run.customerId,
+    });
     return new NextResponse("forbidden", { status: 403 });
   }
 
