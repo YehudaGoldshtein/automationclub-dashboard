@@ -14,6 +14,9 @@ async function upsertUser(opts: {
   role: "admin" | "customer";
   customerId: string | null;
 }) {
+  // Store and query lower-cased to match the credentials provider, which
+  // normalizes user input before lookup.
+  opts.email = opts.email.toLowerCase().trim();
   const [existing] = await db.select().from(users).where(eq(users.email, opts.email)).limit(1);
   const passwordHash = await hash(opts.password, 10);
   if (existing) {
