@@ -93,6 +93,19 @@ export const itemState = pgTable(
   (t) => [primaryKey({ columns: [t.customerId, t.vendorName, t.stateKey, t.sku] })],
 );
 
+export const storeProducts = pgTable(
+  "store_products",
+  {
+    customerId: text("customer_id").notNull(),
+    sku: text("sku").notNull(),
+    handle: text("handle"),
+    title: text("title"),
+    storeProductId: text("store_product_id"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.customerId, t.sku] })],
+);
+
 export const vendorSnapshotCache = pgTable(
   "vendor_snapshot_cache",
   {

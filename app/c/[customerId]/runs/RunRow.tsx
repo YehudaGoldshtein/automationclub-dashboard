@@ -17,6 +17,12 @@ type Change = {
     vendorName: string;
     isAvailable: boolean;
   } | null;
+  store: {
+    title: string | null;
+    handle: string | null;
+    storefrontUrl: string | null;
+    adminUrl: string | null;
+  } | null;
 };
 
 type ErrorRow = {
@@ -142,9 +148,32 @@ function RunDetails({ changes, errors }: { changes: Change[]; errors: ErrorRow[]
                         <div className="h-10 w-10 rounded bg-slate-800" />
                       )}
                     </td>
-                    <td className="px-3 py-2 font-mono text-slate-200">{c.sku}</td>
+                    <td className="px-3 py-2 font-mono text-slate-200">
+                      {c.store?.storefrontUrl ? (
+                        <a
+                          href={c.store.storefrontUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline decoration-slate-700 underline-offset-2 hover:decoration-slate-400"
+                        >
+                          {c.sku}
+                        </a>
+                      ) : (
+                        c.sku
+                      )}
+                      {c.store?.adminUrl && (
+                        <a
+                          href={c.store.adminUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="ml-2 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-300 hover:bg-slate-700"
+                        >
+                          admin
+                        </a>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-slate-300">
-                      {c.vendor?.name || <span className="text-slate-600">—</span>}
+                      {c.store?.title || c.vendor?.name || <span className="text-slate-600">—</span>}
                     </td>
                     <td className="px-3 py-2 text-slate-400">{c.kind}</td>
                     <td className="px-3 py-2 tabular-nums">
