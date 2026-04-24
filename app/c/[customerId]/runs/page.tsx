@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 
 import { resolveCustomerScope } from "@/lib/auth-helpers";
 import { db, syncRuns } from "@/lib/db";
+import { RunRow, type RunSummary } from "./RunRow";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,16 @@ export default async function RunsPage({
     .orderBy(desc(syncRuns.startedAt))
     .limit(100);
 
+  const serialized: RunSummary[] = rows.map((r) => ({
+    runId: r.runId,
+    startedAt: r.startedAt.toISOString(),
+    itemsChecked: r.itemsChecked,
+    changesPlannedCount: r.changesPlannedCount,
+    changesAppliedCount: r.changesAppliedCount,
+    errorsCount: r.errorsCount,
+    durationSeconds: r.durationSeconds,
+  }));
+
   return (
     <div className="overflow-hidden rounded-xl border border-slate-800">
       <table className="w-full text-sm">
@@ -34,24 +45,10 @@ export default async function RunsPage({
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-800">
-          {rows.map((r) => (
-            <tr key={r.runId}>
-              <td className="px-4 py-2 font-mono text-xs text-slate-400">{r.runId}</td>
-              <td className="px-4 py-2 text-slate-400">
-                {new Date(r.startedAt).toLocaleString()}
-              </td>
-              <td className="px-4 py-2">{r.itemsChecked}</td>
-              <td className="px-4 py-2">{r.changesPlannedCount}</td>
-              <td className="px-4 py-2">{r.changesAppliedCount}</td>
-              <td className={`px-4 py-2 ${r.errorsCount > 0 ? "text-red-400" : ""}`}>
-                {r.errorsCount}
-              </td>
-              <td className="px-4 py-2 text-slate-400">
-                {r.durationSeconds ? `${Number(r.durationSeconds).toFixed(2)}s` : "—"}
-              </td>
-            </tr>
+          {serialized.map((r) => (
+            <RunRow key={r.runId} run={r} />
           ))}
-          {rows.length === 0 && (
+          {serialized.length === 0 && (
             <tr>
               <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
                 No runs recorded yet.
