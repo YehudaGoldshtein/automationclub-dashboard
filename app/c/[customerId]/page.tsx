@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { resolveCustomerScope } from "@/lib/auth-helpers";
 import { db, itemState, syncRuns, vendorSnapshotCache } from "@/lib/db";
 import { TriggerSyncButton } from "./trigger-button";
+import { UploadInventoryButton } from "./upload-inventory";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,10 @@ export default async function CustomerOverview({
 
       <section>
         <h2 className="mb-3 text-sm uppercase tracking-wider text-slate-400">Actions</h2>
-        <TriggerSyncButton customerId={cid} />
+        <div className="space-y-3">
+          <TriggerSyncButton customerId={cid} />
+          <UploadInventoryButton customerId={cid} />
+        </div>
       </section>
 
       <section>
