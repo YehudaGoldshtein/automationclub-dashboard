@@ -9,6 +9,8 @@
 //
 // Keep event names snake_case so they match the Python + Go services.
 
+import { after } from "next/server";
+
 export type Fields = Record<string, unknown>;
 
 type Level = "DEBUG" | "INFO" | "WARN" | "ERROR";
@@ -52,13 +54,24 @@ function buildPayload(level: Level, msg: string, fields?: Fields) {
   return payload;
 }
 
+// Vercel serverless freezes the invocation once the response is sent, which
+// drops in-flight fire-and-forget fetches. `after()` uses waitUntil under the
+// hood to keep the invocation alive until the Axiom POST settles.
+function scheduleAxiom(payload: Record<string, unknown>) {
+  try {
+    after(() => postToAxiom(payload));
+  } catch {
+    // Called outside a request scope (e.g. a CLI script or build) — best effort.
+    void postToAxiom(payload);
+  }
+}
+
 function emit(level: Level, msg: string, fields?: Fields) {
   const payload = buildPayload(level, msg, fields);
   // eslint-disable-next-line no-console
   const out = level === "ERROR" || level === "WARN" ? console.warn : console.log;
   out(JSON.stringify(payload));
-  // Fire-and-forget for the common path.
-  void postToAxiom(payload);
+  scheduleAxiom(payload);
 }
 
 export const log = {
