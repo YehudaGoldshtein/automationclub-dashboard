@@ -4,7 +4,7 @@ import { resolveCustomerScope } from "@/lib/auth-helpers";
 import { customers, db, storeProducts } from "@/lib/db";
 import type { Customer } from "@/lib/types";
 import { TriggerSyncButton } from "../trigger-button";
-import { ApproveButton } from "./approve-button";
+import { PendingActions } from "./pending-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -153,7 +153,7 @@ export default async function PendingPage({
               </div>
 
               <div className="mt-4 flex items-center justify-between gap-3 pt-2">
-                <ApproveButton customerId={cid} storeProductId={p.storeProductId ?? ""} />
+                <PendingActions customerId={cid} storeProductId={p.storeProductId ?? ""} />
                 {p.adminUrl && (
                   <a
                     href={p.adminUrl}
