@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { and, desc, eq } from "drizzle-orm";
 
 import { resolveCustomerScope } from "@/lib/auth-helpers";
-import { db, itemState, syncRuns, vendorSnapshotCache } from "@/lib/db";
+import { db, itemState, storeProducts, syncRuns, vendorSnapshotCache } from "@/lib/db";
 import { TriggerSyncButton } from "./trigger-button";
 import { UploadInventoryButton } from "./upload-inventory";
 
@@ -35,9 +36,23 @@ export default async function CustomerOverview({
 
   const cacheSize = await db.select({ id: vendorSnapshotCache.vendorProductId }).from(vendorSnapshotCache);
 
+  // Pending drafts awaiting review, counted per product (not per variant SKU).
+  const pendingRows = await db
+    .select({ storeProductId: storeProducts.storeProductId })
+    .from(storeProducts)
+    .where(
+      and(
+        eq(storeProducts.customerId, cid),
+        eq(storeProducts.status, "draft"),
+        eq(storeProducts.approved, false),
+      ),
+    );
+  const pendingCount = new Set(pendingRows.map((r) => r.storeProductId)).size;
+
   return (
     <div className="space-y-8">
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <PendingCard customerId={cid} count={pendingCount} />
         <Card label="Unarchive candidates" value={activeStateCount.length} />
         <Card label="Cached vendor snapshots (all vendors)" value={cacheSize.length} />
         <Card label="Recent runs" value={recentRuns.length} />
@@ -105,5 +120,29 @@ function Card({ label, value }: { label: string; value: number }) {
       <div className="text-xs uppercase tracking-wider text-slate-500">{label}</div>
       <div className="mt-2 text-3xl font-semibold tabular-nums">{value}</div>
     </div>
+  );
+}
+
+// Linked card that highlights when there are drafts awaiting review.
+function PendingCard({ customerId, count }: { customerId: string; count: number }) {
+  const active = count > 0;
+  return (
+    <Link
+      href={`/c/${customerId}/pending`}
+      className={`rounded-xl border p-4 transition-colors ${
+        active
+          ? "border-amber-700/60 bg-amber-950/30 hover:border-amber-600"
+          : "border-slate-800 bg-slate-900/40 hover:border-slate-700"
+      }`}
+    >
+      <div
+        className={`text-xs uppercase tracking-wider ${
+          active ? "text-amber-300" : "text-slate-500"
+        }`}
+      >
+        Pending review
+      </div>
+      <div className="mt-2 text-3xl font-semibold tabular-nums">{count}</div>
+    </Link>
   );
 }

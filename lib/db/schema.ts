@@ -93,6 +93,9 @@ export const itemState = pgTable(
   (t) => [primaryKey({ columns: [t.customerId, t.vendorName, t.stateKey, t.sku] })],
 );
 
+// store_products is inventory-sync owned, EXCEPT the dashboard's pending-review
+// flow writes `approved` / `approved_at` (Neon-only; the Python sync job holds
+// the Shopify token and later flips draft→active in Shopify for approved rows).
 export const storeProducts = pgTable(
   "store_products",
   {
@@ -101,6 +104,12 @@ export const storeProducts = pgTable(
     handle: text("handle"),
     title: text("title"),
     storeProductId: text("store_product_id"),
+    // Lifecycle columns (added Python-side for the draft → approve → activate flow).
+    status: text("status").notNull().default("active"), // 'draft' | 'active'
+    approved: boolean("approved").notNull().default(true),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    isNewCollection: boolean("is_new_collection").notNull().default(false),
+    needsReview: boolean("needs_review").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.customerId, t.sku] })],

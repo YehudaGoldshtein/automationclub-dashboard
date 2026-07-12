@@ -58,6 +58,7 @@ export default async function CustomerLayout({ children, params }: Props) {
 
       <nav className="mb-6 flex gap-4 border-b border-slate-800 text-sm">
         <TabLink href={`/c/${customer.id}`} label="Overview" />
+        <TabLink href={`/c/${customer.id}/pending`} label="Pending" />
         <TabLink href={`/c/${customer.id}/runs`} label="Runs" />
         <TabLink href={`/c/${customer.id}/state`} label="State" />
       </nav>
