@@ -20,11 +20,12 @@ const AXIOM_TOKEN = process.env.AXIOM_API_TOKEN || "";
 const AXIOM_DATASET = process.env.AXIOM_DATASET || "";
 const AXIOM_READY = Boolean(AXIOM_TOKEN && AXIOM_DATASET);
 
-function sendToAxiom(payload: Record<string, unknown>): void {
-  if (!AXIOM_READY) return;
+// Returns the POST promise so callers can await delivery when it matters
+// (e.g. an error path that may otherwise be cut off when the function ends).
+function postToAxiom(payload: Record<string, unknown>): Promise<void> {
+  if (!AXIOM_READY) return Promise.resolve();
   const url = `${AXIOM_URL.replace(/\/+$/, "")}/v1/datasets/${AXIOM_DATASET}/ingest`;
-  // Fire-and-forget; errors are swallowed so logging never crashes a request.
-  fetch(url, {
+  return fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${AXIOM_TOKEN}`,
@@ -33,12 +34,14 @@ function sendToAxiom(payload: Record<string, unknown>): void {
     body: JSON.stringify([payload]),
     // Hint to the runtime not to wait on this request's completion.
     keepalive: true,
-  }).catch(() => {
-    // Intentional no-op: logging failures must never propagate.
-  });
+  })
+    .then(() => undefined)
+    .catch(() => {
+      // Intentional no-op: logging failures must never propagate.
+    });
 }
 
-function emit(level: Level, msg: string, fields?: Fields) {
+function buildPayload(level: Level, msg: string, fields?: Fields) {
   const payload: Record<string, unknown> = {
     _time: new Date().toISOString(),
     level,
@@ -46,10 +49,16 @@ function emit(level: Level, msg: string, fields?: Fields) {
     service: SERVICE,
   };
   if (fields) Object.assign(payload, fields);
+  return payload;
+}
+
+function emit(level: Level, msg: string, fields?: Fields) {
+  const payload = buildPayload(level, msg, fields);
   // eslint-disable-next-line no-console
   const out = level === "ERROR" || level === "WARN" ? console.warn : console.log;
   out(JSON.stringify(payload));
-  sendToAxiom(payload);
+  // Fire-and-forget for the common path.
+  void postToAxiom(payload);
 }
 
 export const log = {
@@ -57,4 +66,12 @@ export const log = {
   info(msg: string, fields?: Fields) { emit("INFO", msg, fields); },
   warn(msg: string, fields?: Fields) { emit("WARN", msg, fields); },
   error(msg: string, fields?: Fields) { emit("ERROR", msg, fields); },
+  // Awaitable error: use where the caller can/should wait for Axiom delivery,
+  // such as instrumentation's onRequestError hook.
+  async errorAsync(msg: string, fields?: Fields) {
+    const payload = buildPayload("ERROR", msg, fields);
+    // eslint-disable-next-line no-console
+    console.warn(JSON.stringify(payload));
+    await postToAxiom(payload);
+  },
 };
