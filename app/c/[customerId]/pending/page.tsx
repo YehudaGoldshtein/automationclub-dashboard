@@ -4,7 +4,7 @@ import { resolveCustomerScope } from "@/lib/auth-helpers";
 import { customers, db, storeProducts } from "@/lib/db";
 import type { Customer } from "@/lib/types";
 import { TriggerSyncButton } from "../trigger-button";
-import { PendingActions } from "./pending-actions";
+import { PendingList } from "./pending-list";
 
 export const dynamic = "force-dynamic";
 
@@ -112,62 +112,7 @@ export default async function PendingPage({
           No products pending review.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {products.map((p) => (
-            <div
-              key={p.storeProductId ?? p.skus[0]}
-              className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/40 p-4"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="font-medium text-slate-100">
-                  {p.title || <span className="text-slate-500">Untitled draft</span>}
-                </h3>
-                <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                  {p.isNewCollection && (
-                    <span className="rounded bg-sky-900/50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-sky-300">
-                      ⚠️ New collection
-                    </span>
-                  )}
-                  {p.needsReview && (
-                    <span className="rounded bg-amber-900/50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-300">
-                      ⚠️ Needs review
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-2 text-xs text-slate-400">
-                <span className="uppercase tracking-wider text-slate-500">
-                  {p.skus.length} variant{p.skus.length === 1 ? "" : "s"}
-                </span>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {p.skus.map((sku) => (
-                    <span
-                      key={sku}
-                      className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] text-slate-300"
-                    >
-                      {sku}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center justify-between gap-3 pt-2">
-                <PendingActions customerId={cid} storeProductId={p.storeProductId ?? ""} />
-                {p.adminUrl && (
-                  <a
-                    href={p.adminUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded bg-slate-800 px-2 py-1 text-[11px] uppercase tracking-wide text-slate-300 hover:bg-slate-700"
-                  >
-                    Review in Shopify
-                  </a>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+        <PendingList customerId={cid} products={products} />
       )}
     </div>
   );

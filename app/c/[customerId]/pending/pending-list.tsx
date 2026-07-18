@@ -1,0 +1,204 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+
+import { PendingActions } from "./pending-actions";
+
+export type PendingProductDTO = {
+  storeProductId: string | null;
+  title: string | null;
+  skus: string[];
+  isNewCollection: boolean;
+  needsReview: boolean;
+  adminUrl: string | null;
+};
+
+export function PendingList({
+  customerId,
+  products,
+}: {
+  customerId: string;
+  products: PendingProductDTO[];
+}) {
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pending, startTransition] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+  const router = useRouter();
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter(
+      (p) =>
+        (p.title?.toLowerCase().includes(q) ?? false) ||
+        p.skus.some((s) => s.toLowerCase().includes(q)),
+    );
+  }, [products, query]);
+
+  // Only products with a real store_product_id can be acted on in bulk.
+  const selectableIds = useMemo(
+    () => filtered.map((p) => p.storeProductId).filter((id): id is string => !!id),
+    [filtered],
+  );
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(selectableIds));
+  }
+
+  function bulk(action: "approve" | "ignore") {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    startTransition(async () => {
+      setErr(null);
+      const res = await fetch("/api/pending/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId, storeProductIds: ids, action }),
+      });
+      if (res.ok) {
+        setSelected(new Set());
+        router.refresh();
+      } else {
+        const text = await res.text();
+        setErr(`Bulk ${action} failed: ${text || res.statusText}`);
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search title or SKU…"
+          className="w-64 rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 placeholder:text-slate-500 focus:border-slate-500 focus:outline-none"
+        />
+        <label className="flex items-center gap-2 text-xs text-slate-400">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={toggleAll}
+            disabled={selectableIds.length === 0}
+          />
+          Select all ({selectableIds.length})
+        </label>
+        <span className="text-xs text-slate-500">
+          {filtered.length} of {products.length} shown
+        </span>
+      </div>
+
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-2">
+          <span className="text-sm text-slate-300">{selected.size} selected</span>
+          <button
+            disabled={pending}
+            onClick={() => bulk("approve")}
+            className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+          >
+            {pending ? "Working…" : `Confirm ${selected.size}`}
+          </button>
+          <button
+            disabled={pending}
+            onClick={() => bulk("ignore")}
+            className="rounded-md border border-slate-600 px-3 py-1.5 text-sm font-medium text-slate-300 hover:border-slate-400 hover:text-white disabled:opacity-50"
+          >
+            {pending ? "Working…" : `Ignore ${selected.size}`}
+          </button>
+          {err && <span className="text-xs text-red-400">{err}</span>}
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <div className="rounded-xl border border-slate-800 px-4 py-12 text-center text-slate-500">
+          No products match “{query}”.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {filtered.map((p) => {
+            const id = p.storeProductId;
+            const checked = id ? selected.has(id) : false;
+            return (
+              <div
+                key={id ?? p.skus[0]}
+                className={`flex flex-col rounded-xl border p-4 ${
+                  checked ? "border-emerald-700/60 bg-emerald-950/20" : "border-slate-800 bg-slate-900/40"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={checked}
+                      disabled={!id}
+                      onChange={() => id && toggle(id)}
+                    />
+                    <h3 className="font-medium text-slate-100">
+                      {p.title || <span className="text-slate-500">Untitled draft</span>}
+                    </h3>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                    {p.isNewCollection && (
+                      <span className="rounded bg-sky-900/50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-sky-300">
+                        ⚠️ New collection
+                      </span>
+                    )}
+                    {p.needsReview && (
+                      <span className="rounded bg-amber-900/50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-300">
+                        ⚠️ Needs review
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-2 text-xs text-slate-400">
+                  <span className="uppercase tracking-wider text-slate-500">
+                    {p.skus.length} variant{p.skus.length === 1 ? "" : "s"}
+                  </span>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {p.skus.map((sku) => (
+                      <span
+                        key={sku}
+                        className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] text-slate-300"
+                      >
+                        {sku}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between gap-3 pt-2">
+                  <PendingActions customerId={customerId} storeProductId={id ?? ""} />
+                  {p.adminUrl && (
+                    <a
+                      href={p.adminUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded bg-slate-800 px-2 py-1 text-[11px] uppercase tracking-wide text-slate-300 hover:bg-slate-700"
+                    >
+                      Review in Shopify
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
