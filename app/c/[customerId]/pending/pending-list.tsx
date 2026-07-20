@@ -17,9 +17,13 @@ export type PendingProductDTO = {
 export function PendingList({
   customerId,
   products,
+  actionable = true,
 }: {
   customerId: string;
   products: PendingProductDTO[];
+  // When false (e.g. the read-only "Needs review" view), hide selection,
+  // bulk actions, and per-card Confirm/Ignore — those act on drafts only.
+  actionable?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -87,21 +91,23 @@ export function PendingList({
           placeholder="Search title or SKU…"
           className="w-64 rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 placeholder:text-slate-500 focus:border-slate-500 focus:outline-none"
         />
-        <label className="flex items-center gap-2 text-xs text-slate-400">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            onChange={toggleAll}
-            disabled={selectableIds.length === 0}
-          />
-          Select all ({selectableIds.length})
-        </label>
+        {actionable && (
+          <label className="flex items-center gap-2 text-xs text-slate-400">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleAll}
+              disabled={selectableIds.length === 0}
+            />
+            Select all ({selectableIds.length})
+          </label>
+        )}
         <span className="text-xs text-slate-500">
           {filtered.length} of {products.length} shown
         </span>
       </div>
 
-      {selected.size > 0 && (
+      {actionable && selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-2">
           <span className="text-sm text-slate-300">{selected.size} selected</span>
           <button
@@ -130,7 +136,7 @@ export function PendingList({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {filtered.map((p) => {
             const id = p.storeProductId;
-            const checked = id ? selected.has(id) : false;
+            const checked = actionable && id ? selected.has(id) : false;
             return (
               <div
                 key={id ?? p.skus[0]}
@@ -140,13 +146,15 @@ export function PendingList({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      className="mt-1"
-                      checked={checked}
-                      disabled={!id}
-                      onChange={() => id && toggle(id)}
-                    />
+                    {actionable && (
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={checked}
+                        disabled={!id}
+                        onChange={() => id && toggle(id)}
+                      />
+                    )}
                     <h3 className="font-medium text-slate-100">
                       {p.title || <span className="text-slate-500">Untitled draft</span>}
                     </h3>
@@ -182,7 +190,11 @@ export function PendingList({
                 </div>
 
                 <div className="mt-4 flex items-center justify-between gap-3 pt-2">
-                  <PendingActions customerId={customerId} storeProductId={id ?? ""} />
+                  {actionable ? (
+                    <PendingActions customerId={customerId} storeProductId={id ?? ""} />
+                  ) : (
+                    <span />
+                  )}
                   {p.adminUrl && (
                     <a
                       href={p.adminUrl}
