@@ -12,6 +12,7 @@ export type PendingProductDTO = {
   isNewCollection: boolean;
   needsReview: boolean;
   reviewReason: string | null;
+  vendor: string | null;
   adminUrl: string | null;
 };
 
@@ -27,20 +28,31 @@ export function PendingList({
   actionable?: boolean;
 }) {
   const [query, setQuery] = useState("");
+  const [vendorFilter, setVendorFilter] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const router = useRouter();
 
+  // Distinct suppliers present in this list (empty until the backend
+  // populates store_products.vendor — the dropdown appears once it has data).
+  const vendors = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of products) if (p.vendor) set.add(p.vendor);
+    return [...set].sort();
+  }, [products]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter(
-      (p) =>
+    return products.filter((p) => {
+      if (vendorFilter && p.vendor !== vendorFilter) return false;
+      if (!q) return true;
+      return (
         (p.title?.toLowerCase().includes(q) ?? false) ||
-        p.skus.some((s) => s.toLowerCase().includes(q)),
-    );
-  }, [products, query]);
+        p.skus.some((s) => s.toLowerCase().includes(q))
+      );
+    });
+  }, [products, query, vendorFilter]);
 
   // Only products with a real store_product_id can be acted on in bulk.
   const selectableIds = useMemo(
@@ -92,6 +104,20 @@ export function PendingList({
           placeholder="Search title or SKU…"
           className="w-64 rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 placeholder:text-slate-500 focus:border-slate-500 focus:outline-none"
         />
+        {vendors.length > 0 && (
+          <select
+            value={vendorFilter}
+            onChange={(e) => setVendorFilter(e.target.value)}
+            className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 focus:border-slate-500 focus:outline-none"
+          >
+            <option value="">All suppliers</option>
+            {vendors.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        )}
         {actionable && (
           <label className="flex items-center gap-2 text-xs text-slate-400">
             <input
