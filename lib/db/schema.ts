@@ -110,6 +110,7 @@ export const storeProducts = pgTable(
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     isNewCollection: boolean("is_new_collection").notNull().default(false),
     needsReview: boolean("needs_review").notNull().default(false),
+    needsReviewReason: varchar("needs_review_reason"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.customerId, t.sku] })],

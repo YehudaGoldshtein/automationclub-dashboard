@@ -15,6 +15,7 @@ type PendingProduct = {
   skus: string[];
   isNewCollection: boolean;
   needsReview: boolean;
+  reviewReason: string | null;
   adminUrl: string | null;
 };
 
@@ -84,6 +85,7 @@ export default async function PendingPage({
         skus: [],
         isNewCollection: false,
         needsReview: false,
+        reviewReason: null,
         adminUrl:
           r.storeProductId && myshopify
             ? `https://${myshopify}/admin/products/${r.storeProductId}`
@@ -95,6 +97,7 @@ export default async function PendingPage({
     if (!g.title && r.title) g.title = r.title;
     g.isNewCollection ||= r.isNewCollection;
     g.needsReview ||= r.needsReview;
+    if (!g.reviewReason && r.needsReviewReason) g.reviewReason = r.needsReviewReason;
   }
   const products = [...byProduct.values()];
 

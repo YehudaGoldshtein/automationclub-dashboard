@@ -11,6 +11,7 @@ export type PendingProductDTO = {
   skus: string[];
   isNewCollection: boolean;
   needsReview: boolean;
+  reviewReason: string | null;
   adminUrl: string | null;
 };
 
@@ -172,6 +173,13 @@ export function PendingList({
                     )}
                   </div>
                 </div>
+
+                {p.needsReview && p.reviewReason && (
+                  <div className="mt-2 rounded border border-amber-900/40 bg-amber-950/30 px-2 py-1 text-xs text-amber-300">
+                    <span className="uppercase tracking-wider text-amber-500/80">Reason: </span>
+                    {p.reviewReason}
+                  </div>
+                )}
 
                 <div className="mt-2 text-xs text-slate-400">
                   <span className="uppercase tracking-wider text-slate-500">
