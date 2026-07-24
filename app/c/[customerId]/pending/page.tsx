@@ -125,7 +125,7 @@ export default async function PendingPage({
     missing: {
       heading: "Missing at source",
       blurb:
-        "Products no longer found at the supplier. Delete marks them for removal from Shopify on the next sync.",
+        "Products no longer found at the supplier. Delete permanently removes them from Shopify on the next reconcile (~1h) — this can't be undone.",
       countLabel: "missing",
       empty: "Nothing missing at source.",
     },

@@ -18,6 +18,25 @@ export type PendingProductDTO = {
 
 export type ListMode = "pending" | "review" | "missing";
 
+// needs_review_reason is a comma-joined list of codes from the backend.
+const REVIEW_LABELS: Record<string, string> = {
+  no_image: "No image",
+  no_price: "No price",
+  no_collection: "No collection",
+  no_body: "No description",
+  image_rejected: "Image rejected",
+  supplier_flag: "Supplier flag",
+  multi_variant: "Multiple variants",
+};
+
+function reasonLabels(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .map((code) => REVIEW_LABELS[code] ?? code);
+}
+
 export function PendingList({
   customerId,
   products,
@@ -77,6 +96,12 @@ export function PendingList({
 
   function act(ids: string[], action: "approve" | "ignore" | "delete") {
     if (ids.length === 0) return;
+    if (action === "delete") {
+      const ok = window.confirm(
+        `Permanently delete ${ids.length} product${ids.length === 1 ? "" : "s"} from Shopify on the next sync? This can't be undone.`,
+      );
+      if (!ok) return;
+    }
     startTransition(async () => {
       setErr(null);
       const res = await fetch("/api/pending/bulk", {
@@ -213,10 +238,19 @@ export function PendingList({
                   </div>
                 </div>
 
-                {p.needsReview && p.reviewReason && (
-                  <div className="mt-2 rounded border border-amber-900/40 bg-amber-950/30 px-2 py-1 text-xs text-amber-300">
-                    <span className="uppercase tracking-wider text-amber-500/80">Reason: </span>
-                    {p.reviewReason}
+                {p.reviewReason && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1">
+                    <span className="text-[10px] uppercase tracking-wider text-amber-500/80">
+                      Reason:
+                    </span>
+                    {reasonLabels(p.reviewReason).map((label) => (
+                      <span
+                        key={label}
+                        className="rounded border border-amber-900/40 bg-amber-950/40 px-1.5 py-0.5 text-[11px] text-amber-300"
+                      >
+                        {label}
+                      </span>
+                    ))}
                   </div>
                 )}
 
