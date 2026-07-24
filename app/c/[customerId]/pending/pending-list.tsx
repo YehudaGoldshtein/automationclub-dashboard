@@ -16,16 +16,16 @@ export type PendingProductDTO = {
   adminUrl: string | null;
 };
 
+export type ListMode = "pending" | "review" | "missing";
+
 export function PendingList({
   customerId,
   products,
-  actionable = true,
+  mode = "pending",
 }: {
   customerId: string;
   products: PendingProductDTO[];
-  // When false (e.g. the read-only "Needs review" view), hide selection,
-  // bulk actions, and per-card Confirm/Ignore — those act on drafts only.
-  actionable?: boolean;
+  mode?: ListMode;
 }) {
   const [query, setQuery] = useState("");
   const [vendorFilter, setVendorFilter] = useState("");
@@ -33,6 +33,8 @@ export function PendingList({
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const router = useRouter();
+
+  const canSelect = mode !== "review";
 
   // Distinct suppliers present in this list (empty until the backend
   // populates store_products.vendor — the dropdown appears once it has data).
@@ -54,7 +56,6 @@ export function PendingList({
     });
   }, [products, query, vendorFilter]);
 
-  // Only products with a real store_product_id can be acted on in bulk.
   const selectableIds = useMemo(
     () => filtered.map((p) => p.storeProductId).filter((id): id is string => !!id),
     [filtered],
@@ -74,8 +75,7 @@ export function PendingList({
     setSelected(allSelected ? new Set() : new Set(selectableIds));
   }
 
-  function bulk(action: "approve" | "ignore") {
-    const ids = [...selected];
+  function act(ids: string[], action: "approve" | "ignore" | "delete") {
     if (ids.length === 0) return;
     startTransition(async () => {
       setErr(null);
@@ -89,7 +89,7 @@ export function PendingList({
         router.refresh();
       } else {
         const text = await res.text();
-        setErr(`Bulk ${action} failed: ${text || res.statusText}`);
+        setErr(`${action} failed: ${text || res.statusText}`);
       }
     });
   }
@@ -118,7 +118,7 @@ export function PendingList({
             ))}
           </select>
         )}
-        {actionable && (
+        {canSelect && (
           <label className="flex items-center gap-2 text-xs text-slate-400">
             <input
               type="checkbox"
@@ -134,23 +134,36 @@ export function PendingList({
         </span>
       </div>
 
-      {actionable && selected.size > 0 && (
+      {canSelect && selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-2">
           <span className="text-sm text-slate-300">{selected.size} selected</span>
-          <button
-            disabled={pending}
-            onClick={() => bulk("approve")}
-            className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-          >
-            {pending ? "Working…" : `Confirm ${selected.size}`}
-          </button>
-          <button
-            disabled={pending}
-            onClick={() => bulk("ignore")}
-            className="rounded-md border border-slate-600 px-3 py-1.5 text-sm font-medium text-slate-300 hover:border-slate-400 hover:text-white disabled:opacity-50"
-          >
-            {pending ? "Working…" : `Ignore ${selected.size}`}
-          </button>
+          {mode === "pending" && (
+            <>
+              <button
+                disabled={pending}
+                onClick={() => act([...selected], "approve")}
+                className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {pending ? "Working…" : `Confirm ${selected.size}`}
+              </button>
+              <button
+                disabled={pending}
+                onClick={() => act([...selected], "ignore")}
+                className="rounded-md border border-slate-600 px-3 py-1.5 text-sm font-medium text-slate-300 hover:border-slate-400 hover:text-white disabled:opacity-50"
+              >
+                {pending ? "Working…" : `Ignore ${selected.size}`}
+              </button>
+            </>
+          )}
+          {mode === "missing" && (
+            <button
+              disabled={pending}
+              onClick={() => act([...selected], "delete")}
+              className="rounded-md bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
+            >
+              {pending ? "Working…" : `Delete ${selected.size}`}
+            </button>
+          )}
           {err && <span className="text-xs text-red-400">{err}</span>}
         </div>
       )}
@@ -163,7 +176,7 @@ export function PendingList({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {filtered.map((p) => {
             const id = p.storeProductId;
-            const checked = actionable && id ? selected.has(id) : false;
+            const checked = canSelect && id ? selected.has(id) : false;
             return (
               <div
                 key={id ?? p.skus[0]}
@@ -173,7 +186,7 @@ export function PendingList({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-start gap-2">
-                    {actionable && (
+                    {canSelect && (
                       <input
                         type="checkbox"
                         className="mt-1"
@@ -224,11 +237,19 @@ export function PendingList({
                 </div>
 
                 <div className="mt-4 flex items-center justify-between gap-3 pt-2">
-                  {actionable ? (
+                  {mode === "pending" && (
                     <PendingActions customerId={customerId} storeProductId={id ?? ""} />
-                  ) : (
-                    <span />
                   )}
+                  {mode === "missing" && (
+                    <button
+                      disabled={pending || !id}
+                      onClick={() => id && act([id], "delete")}
+                      className="rounded-md bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
+                    >
+                      {pending ? "Working…" : "Delete"}
+                    </button>
+                  )}
+                  {mode === "review" && <span />}
                   {p.adminUrl && (
                     <a
                       href={p.adminUrl}

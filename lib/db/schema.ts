@@ -112,6 +112,7 @@ export const storeProducts = pgTable(
     needsReview: boolean("needs_review").notNull().default(false),
     needsReviewReason: varchar("needs_review_reason"),
     vendor: text("vendor"),
+    missingAtSource: boolean("missing_at_source").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.customerId, t.sku] })],

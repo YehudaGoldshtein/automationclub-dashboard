@@ -6,13 +6,16 @@ import { log } from "@/lib/log";
 import { db, storeProducts } from "@/lib/db";
 
 /**
- * Bulk approve / ignore pending draft products in one round-trip.
+ * Bulk approve / ignore / delete pending products in one round-trip.
  *
- * Neon write ONLY (no Shopify). Same contract as the single-product routes:
- *  - approve → approved=true, approved_at=now()
- *  - ignore  → status='rejected'
- * Scoped via resolveCustomerScope; only draft rows for the caller's tenant are
- * touched. store_product_ids come from the request body, the tenant does not.
+ * Neon write ONLY (no Shopify):
+ *  - approve → approved=true, approved_at=now()   (draft rows)
+ *  - ignore  → status='rejected'                  (draft rows)
+ *  - delete  → status='rejected'                  (missing-at-source rows)
+ * "delete" marks missing-at-source items for deletion; the tokened reconcile
+ * job removes rejected products from Shopify on the next sync.
+ * Scoped via resolveCustomerScope; store_product_ids come from the request
+ * body, the tenant does not.
  */
 export async function POST(req: Request) {
   const session = await requireSession();
@@ -24,8 +27,8 @@ export async function POST(req: Request) {
     ? body.storeProductIds.filter((x: unknown): x is string => typeof x === "string" && x.length > 0)
     : [];
 
-  if (action !== "approve" && action !== "ignore") {
-    return new NextResponse("action must be 'approve' or 'ignore'", { status: 400 });
+  if (action !== "approve" && action !== "ignore" && action !== "delete") {
+    return new NextResponse("action must be 'approve', 'ignore', or 'delete'", { status: 400 });
   }
   if (ids.length === 0) {
     return new NextResponse("storeProductIds required", { status: 400 });
@@ -36,23 +39,27 @@ export async function POST(req: Request) {
     return new NextResponse("customerId required", { status: 400 });
   }
 
-  const where = and(
+  const base = and(
     eq(storeProducts.customerId, scope.customerId),
     inArray(storeProducts.storeProductId, ids),
-    eq(storeProducts.status, "draft"),
   );
+  // approve/ignore act on drafts; delete acts on missing-at-source rows.
+  const scopedWhere =
+    action === "delete"
+      ? and(base, eq(storeProducts.missingAtSource, true))
+      : and(base, eq(storeProducts.status, "draft"));
 
   const updated =
     action === "approve"
       ? await db
           .update(storeProducts)
           .set({ approved: true, approvedAt: sql`now()` })
-          .where(where)
+          .where(scopedWhere)
           .returning({ sku: storeProducts.sku })
       : await db
           .update(storeProducts)
           .set({ status: "rejected" })
-          .where(where)
+          .where(scopedWhere)
           .returning({ sku: storeProducts.sku });
 
   log.info("pending_bulk_ok", {
