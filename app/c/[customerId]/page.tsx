@@ -2,9 +2,17 @@ import Link from "next/link";
 import { and, desc, eq } from "drizzle-orm";
 
 import { resolveCustomerScope } from "@/lib/auth-helpers";
-import { db, itemState, storeProducts, syncRuns, vendorSnapshotCache } from "@/lib/db";
+import {
+  db,
+  itemState,
+  storeProducts,
+  supplierSettings,
+  syncRuns,
+  vendorSnapshotCache,
+} from "@/lib/db";
 import { TriggerSyncButton } from "./trigger-button";
 import { UploadInventoryButton } from "./upload-inventory";
+import { SupplierToggles } from "./supplier-toggles";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +57,19 @@ export default async function CustomerOverview({
     );
   const pendingCount = new Set(pendingRows.map((r) => r.storeProductId)).size;
 
+  // Supplier sync flags — table is backend-owned and may not exist yet.
+  // A missing table (or missing row) means the supplier is enabled by default.
+  let supplierEnabled: Record<string, boolean> = {};
+  try {
+    const rows = await db
+      .select({ supplier: supplierSettings.supplier, enabled: supplierSettings.enabled })
+      .from(supplierSettings)
+      .where(eq(supplierSettings.customerId, cid));
+    supplierEnabled = Object.fromEntries(rows.map((r) => [r.supplier, r.enabled]));
+  } catch {
+    supplierEnabled = {};
+  }
+
   return (
     <div className="space-y-8">
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -64,6 +85,15 @@ export default async function CustomerOverview({
           <TriggerSyncButton customerId={cid} />
           <UploadInventoryButton customerId={cid} />
         </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-sm uppercase tracking-wider text-slate-400">Supplier sync</h2>
+        <p className="mb-3 text-xs text-slate-500">
+          Turn a supplier&apos;s sync on or off. Off = excluded from the next sync
+          (takes effect within ~3h). Doesn&apos;t affect approvals or deletions.
+        </p>
+        <SupplierToggles customerId={cid} initial={supplierEnabled} />
       </section>
 
       <section>

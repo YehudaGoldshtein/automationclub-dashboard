@@ -118,6 +118,20 @@ export const storeProducts = pgTable(
   (t) => [primaryKey({ columns: [t.customerId, t.sku] })],
 );
 
+// Per-supplier sync on/off, backend-owned. A missing row means ENABLED.
+// The dashboard reads these to render toggles and upserts on change; the
+// orchestrator skips disabled suppliers on its next tick.
+export const supplierSettings = pgTable(
+  "supplier_settings",
+  {
+    customerId: text("customer_id").notNull(),
+    supplier: text("supplier").notNull(), // 'laura' | 'segal' | 'bambino' | 'snir'
+    enabled: boolean("enabled").notNull().default(true),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.customerId, t.supplier] })],
+);
+
 export const vendorSnapshotCache = pgTable(
   "vendor_snapshot_cache",
   {
