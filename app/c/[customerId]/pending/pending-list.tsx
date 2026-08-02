@@ -13,10 +13,11 @@ export type PendingProductDTO = {
   needsReview: boolean;
   reviewReason: string | null;
   vendor: string | null;
+  status: string | null;
   adminUrl: string | null;
 };
 
-export type ListMode = "pending" | "review" | "missing";
+export type ListMode = "pending" | "review" | "missing" | "unarchive";
 
 // needs_review_reason is a comma-joined list of codes from the backend.
 const REVIEW_LABELS: Record<string, string> = {
@@ -94,7 +95,7 @@ export function PendingList({
     setSelected(allSelected ? new Set() : new Set(selectableIds));
   }
 
-  function act(ids: string[], action: "approve" | "ignore" | "delete") {
+  function act(ids: string[], action: "approve" | "ignore" | "delete" | "unarchive" | "cancel") {
     if (ids.length === 0) return;
     if (action === "delete") {
       const ok = window.confirm(
@@ -188,6 +189,24 @@ export function PendingList({
             >
               {pending ? "Working…" : `Delete ${selected.size}`}
             </button>
+          )}
+          {mode === "unarchive" && (
+            <>
+              <button
+                disabled={pending}
+                onClick={() => act([...selected], "unarchive")}
+                className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {pending ? "Working…" : `Unarchive ${selected.size}`}
+              </button>
+              <button
+                disabled={pending}
+                onClick={() => act([...selected], "delete")}
+                className="rounded-md bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
+              >
+                {pending ? "Working…" : `Delete ${selected.size}`}
+              </button>
+            </>
           )}
           {err && <span className="text-xs text-red-400">{err}</span>}
         </div>
@@ -283,6 +302,38 @@ export function PendingList({
                       {pending ? "Working…" : "Delete"}
                     </button>
                   )}
+                  {mode === "unarchive" &&
+                    (p.status === "unarchive_requested" ? (
+                      <div className="flex items-center gap-2">
+                        <span className="rounded bg-sky-900/40 px-2 py-1 text-xs text-sky-300">
+                          Unarchiving…
+                        </span>
+                        <button
+                          disabled={pending || !id}
+                          onClick={() => id && act([id], "cancel")}
+                          className="rounded-md border border-slate-600 px-3 py-1.5 text-sm font-medium text-slate-300 hover:border-slate-400 hover:text-white disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          disabled={pending || !id}
+                          onClick={() => id && act([id], "unarchive")}
+                          className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                        >
+                          Unarchive
+                        </button>
+                        <button
+                          disabled={pending || !id}
+                          onClick={() => id && act([id], "delete")}
+                          className="rounded-md bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))}
                   {mode === "review" && <span />}
                   {p.adminUrl && (
                     <a

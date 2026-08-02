@@ -17,6 +17,7 @@ type PendingProduct = {
   needsReview: boolean;
   reviewReason: string | null;
   vendor: string | null;
+  status: string | null;
   adminUrl: string | null;
 };
 
@@ -30,7 +31,13 @@ export default async function PendingPage({
   const { customerId } = await params;
   const sp = await searchParams;
   const view: ListMode =
-    sp.view === "review" ? "review" : sp.view === "missing" ? "missing" : "pending";
+    sp.view === "review"
+      ? "review"
+      : sp.view === "missing"
+        ? "missing"
+        : sp.view === "unarchive"
+          ? "unarchive"
+          : "pending";
 
   const scope = await resolveCustomerScope(customerId);
   const cid = scope.customerId!;
@@ -59,19 +66,32 @@ export default async function PendingPage({
     eq(storeProducts.missingAtSource, true),
     ne(storeProducts.status, "rejected"),
   );
+  const unarchiveWhere = and(
+    eq(storeProducts.customerId, cid),
+    eq(storeProducts.unarchiveCandidate, true),
+    ne(storeProducts.status, "rejected"),
+  );
 
   // Counts for each toggle segment (per product, not per variant SKU).
-  const [pendingAgg, reviewAgg, missingAgg] = await Promise.all([
+  const [pendingAgg, reviewAgg, missingAgg, unarchiveAgg] = await Promise.all([
     db.select({ n: countDistinct(storeProducts.storeProductId) }).from(storeProducts).where(pendingWhere),
     db.select({ n: countDistinct(storeProducts.storeProductId) }).from(storeProducts).where(reviewWhere),
     db.select({ n: countDistinct(storeProducts.storeProductId) }).from(storeProducts).where(missingWhere),
+    db.select({ n: countDistinct(storeProducts.storeProductId) }).from(storeProducts).where(unarchiveWhere),
   ]);
   const pendingCount = Number(pendingAgg[0]?.n ?? 0);
   const reviewCount = Number(reviewAgg[0]?.n ?? 0);
   const missingCount = Number(missingAgg[0]?.n ?? 0);
+  const unarchiveCount = Number(unarchiveAgg[0]?.n ?? 0);
 
   const activeWhere =
-    view === "review" ? reviewWhere : view === "missing" ? missingWhere : pendingWhere;
+    view === "review"
+      ? reviewWhere
+      : view === "missing"
+        ? missingWhere
+        : view === "unarchive"
+          ? unarchiveWhere
+          : pendingWhere;
   const rows = await db
     .select()
     .from(storeProducts)
@@ -92,6 +112,7 @@ export default async function PendingPage({
         needsReview: false,
         reviewReason: null,
         vendor: r.vendor,
+        status: r.status,
         adminUrl:
           r.storeProductId && myshopify
             ? `https://${myshopify}/admin/products/${r.storeProductId}`
@@ -129,6 +150,13 @@ export default async function PendingPage({
       countLabel: "missing",
       empty: "Nothing missing at source.",
     },
+    unarchive: {
+      heading: "Unarchive candidates",
+      blurb:
+        "Archived in Shopify but back in stock at the supplier. Unarchive republishes on the next reconcile (~3h); Delete permanently removes it instead.",
+      countLabel: "candidates",
+      empty: "No unarchive candidates.",
+    },
   }[view];
 
   return (
@@ -157,6 +185,12 @@ export default async function PendingPage({
           active={view === "missing"}
           label="Missing at source"
           count={missingCount}
+        />
+        <Segment
+          href={`/c/${cid}/pending?view=unarchive`}
+          active={view === "unarchive"}
+          label="Unarchive"
+          count={unarchiveCount}
         />
       </nav>
 
