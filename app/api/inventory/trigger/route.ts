@@ -17,6 +17,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const requestedId: string | undefined = body?.customerId;
   const blobUrl: string | undefined = body?.blobUrl;
+  const runRef: string | undefined = body?.runRef;
 
   if (!blobUrl) {
     return new NextResponse("blobUrl required", { status: 400 });
@@ -52,6 +53,9 @@ export async function POST(req: Request) {
       inputs: {
         blob_url: blobUrl,
         customer_id: requestedId ?? "",
+        dry_run: "false",
+        // Tracking key the backend writes into ingest_runs; optional server-side.
+        ...(runRef ? { run_ref: runRef } : {}),
       },
       headers: {
         authorization: `Bearer ${token}`,
@@ -74,10 +78,12 @@ export async function POST(req: Request) {
     customer_id: requestedId ?? null,
     workflow: `${owner}/${repo}/${workflow}`,
     blob_url: blobUrl,
+    run_ref: runRef ?? null,
   });
   return NextResponse.json({
     ok: true,
     triggered_by: session.user.email,
     customer_id: requestedId ?? null,
+    run_ref: runRef ?? null,
   });
 }
