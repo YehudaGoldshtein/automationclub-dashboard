@@ -17,7 +17,7 @@ export type PendingProductDTO = {
   adminUrl: string | null;
 };
 
-export type ListMode = "pending" | "review" | "missing" | "unarchive";
+export type ListMode = "pending" | "review" | "missing" | "unarchive" | "blacklist";
 
 // needs_review_reason is a comma-joined list of codes from the backend.
 const REVIEW_LABELS: Record<string, string> = {
@@ -95,7 +95,10 @@ export function PendingList({
     setSelected(allSelected ? new Set() : new Set(selectableIds));
   }
 
-  function act(ids: string[], action: "approve" | "ignore" | "delete" | "unarchive" | "cancel") {
+  function act(
+    ids: string[],
+    action: "approve" | "ignore" | "delete" | "unarchive" | "cancel" | "blacklist" | "release",
+  ) {
     if (ids.length === 0) return;
     if (action === "delete") {
       const ok = window.confirm(
@@ -206,7 +209,23 @@ export function PendingList({
               >
                 {pending ? "Working…" : `Delete ${selected.size}`}
               </button>
+              <button
+                disabled={pending}
+                onClick={() => act([...selected], "blacklist")}
+                className="rounded-md border border-amber-700/70 px-3 py-1.5 text-sm font-medium text-amber-300 hover:bg-amber-950/40 disabled:opacity-50"
+              >
+                {pending ? "Working…" : `Blacklist ${selected.size}`}
+              </button>
             </>
+          )}
+          {mode === "blacklist" && (
+            <button
+              disabled={pending}
+              onClick={() => act([...selected], "release")}
+              className="rounded-md border border-slate-600 px-3 py-1.5 text-sm font-medium text-slate-300 hover:border-slate-400 hover:text-white disabled:opacity-50"
+            >
+              {pending ? "Working…" : `Release ${selected.size}`}
+            </button>
           )}
           {err && <span className="text-xs text-red-400">{err}</span>}
         </div>
@@ -332,8 +351,25 @@ export function PendingList({
                         >
                           Delete
                         </button>
+                        <button
+                          disabled={pending || !id}
+                          onClick={() => id && act([id], "blacklist")}
+                          className="rounded-md border border-amber-700/70 px-3 py-1.5 text-sm font-medium text-amber-300 hover:bg-amber-950/40 disabled:opacity-50"
+                          title="Keep archived forever — never recommend or republish"
+                        >
+                          Blacklist
+                        </button>
                       </div>
                     ))}
+                  {mode === "blacklist" && (
+                    <button
+                      disabled={pending || !id}
+                      onClick={() => id && act([id], "release")}
+                      className="rounded-md border border-slate-600 px-3 py-1.5 text-sm font-medium text-slate-300 hover:border-slate-400 hover:text-white disabled:opacity-50"
+                    >
+                      Release
+                    </button>
+                  )}
                   {mode === "review" && <span />}
                   {p.adminUrl && (
                     <a

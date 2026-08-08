@@ -5,7 +5,15 @@ import { requireSession, resolveCustomerScope } from "@/lib/auth-helpers";
 import { log } from "@/lib/log";
 import { db, storeProducts } from "@/lib/db";
 
-const ACTIONS = ["approve", "ignore", "delete", "unarchive", "cancel"] as const;
+const ACTIONS = [
+  "approve",
+  "ignore",
+  "delete",
+  "unarchive",
+  "cancel",
+  "blacklist",
+  "release",
+] as const;
 type Action = (typeof ACTIONS)[number];
 
 /**
@@ -15,6 +23,8 @@ type Action = (typeof ACTIONS)[number];
  *  - delete    → status='rejected'                 (missing-at-source OR unarchive-candidate rows)
  *  - unarchive → status='unarchive_requested'      (unarchive-candidate rows)
  *  - cancel    → status='active'                   (rows currently unarchive_requested)
+ *  - blacklist → blacklisted=true, unarchive_candidate=false  (unarchive-candidate rows; keep archived forever)
+ *  - release   → blacklisted=false                 (blacklisted rows)
  * The tokened reconcile job reads these and applies them in Shopify next sync.
  * Scoped via resolveCustomerScope; store_product_ids come from the request
  * body, the tenant does not.
@@ -86,6 +96,20 @@ export async function POST(req: Request) {
         .update(storeProducts)
         .set({ status: "active" })
         .where(and(base, eq(storeProducts.status, "unarchive_requested")))
+        .returning({ sku: storeProducts.sku });
+      break;
+    case "blacklist":
+      updated = await db
+        .update(storeProducts)
+        .set({ blacklisted: true, unarchiveCandidate: false })
+        .where(and(base, eq(storeProducts.unarchiveCandidate, true)))
+        .returning({ sku: storeProducts.sku });
+      break;
+    case "release":
+      updated = await db
+        .update(storeProducts)
+        .set({ blacklisted: false })
+        .where(and(base, eq(storeProducts.blacklisted, true)))
         .returning({ sku: storeProducts.sku });
       break;
   }

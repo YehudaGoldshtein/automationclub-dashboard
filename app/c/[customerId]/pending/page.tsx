@@ -37,7 +37,9 @@ export default async function PendingPage({
         ? "missing"
         : sp.view === "unarchive"
           ? "unarchive"
-          : "pending";
+          : sp.view === "blacklist"
+            ? "blacklist"
+            : "pending";
 
   const scope = await resolveCustomerScope(customerId);
   const cid = scope.customerId!;
@@ -71,18 +73,24 @@ export default async function PendingPage({
     eq(storeProducts.unarchiveCandidate, true),
     ne(storeProducts.status, "rejected"),
   );
+  const blacklistWhere = and(
+    eq(storeProducts.customerId, cid),
+    eq(storeProducts.blacklisted, true),
+  );
 
   // Counts for each toggle segment (per product, not per variant SKU).
-  const [pendingAgg, reviewAgg, missingAgg, unarchiveAgg] = await Promise.all([
+  const [pendingAgg, reviewAgg, missingAgg, unarchiveAgg, blacklistAgg] = await Promise.all([
     db.select({ n: countDistinct(storeProducts.storeProductId) }).from(storeProducts).where(pendingWhere),
     db.select({ n: countDistinct(storeProducts.storeProductId) }).from(storeProducts).where(reviewWhere),
     db.select({ n: countDistinct(storeProducts.storeProductId) }).from(storeProducts).where(missingWhere),
     db.select({ n: countDistinct(storeProducts.storeProductId) }).from(storeProducts).where(unarchiveWhere),
+    db.select({ n: countDistinct(storeProducts.storeProductId) }).from(storeProducts).where(blacklistWhere),
   ]);
   const pendingCount = Number(pendingAgg[0]?.n ?? 0);
   const reviewCount = Number(reviewAgg[0]?.n ?? 0);
   const missingCount = Number(missingAgg[0]?.n ?? 0);
   const unarchiveCount = Number(unarchiveAgg[0]?.n ?? 0);
+  const blacklistCount = Number(blacklistAgg[0]?.n ?? 0);
 
   const activeWhere =
     view === "review"
@@ -91,7 +99,9 @@ export default async function PendingPage({
         ? missingWhere
         : view === "unarchive"
           ? unarchiveWhere
-          : pendingWhere;
+          : view === "blacklist"
+            ? blacklistWhere
+            : pendingWhere;
   const rows = await db
     .select()
     .from(storeProducts)
@@ -153,9 +163,16 @@ export default async function PendingPage({
     unarchive: {
       heading: "Unarchive candidates",
       blurb:
-        "Archived in Shopify but back in stock at the supplier. Unarchive republishes on the next reconcile (~3h); Delete permanently removes it instead.",
+        "Archived in Shopify but back in stock at the supplier. Unarchive republishes on the next reconcile (~3h); Delete permanently removes it; Blacklist keeps it archived forever.",
       countLabel: "candidates",
       empty: "No unarchive candidates.",
+    },
+    blacklist: {
+      heading: "Blacklisted products",
+      blurb:
+        "Kept archived permanently — never recommended as an unarchive candidate or republished. Release to allow it back if it's archived and restocked.",
+      countLabel: "blacklisted",
+      empty: "No blacklisted products.",
     },
   }[view];
 
@@ -191,6 +208,12 @@ export default async function PendingPage({
           active={view === "unarchive"}
           label="Unarchive"
           count={unarchiveCount}
+        />
+        <Segment
+          href={`/c/${cid}/pending?view=blacklist`}
+          active={view === "blacklist"}
+          label="Blacklist"
+          count={blacklistCount}
         />
       </nav>
 
