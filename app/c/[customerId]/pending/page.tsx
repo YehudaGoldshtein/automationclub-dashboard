@@ -72,6 +72,11 @@ export default async function PendingPage({
     eq(storeProducts.customerId, cid),
     eq(storeProducts.unarchiveCandidate, true),
     ne(storeProducts.status, "rejected"),
+    // Drafts are net-new items awaiting review — they live in the Pending tab, not
+    // here. The candidate flag is `not active` (draft OR archived), so without this
+    // guard every pending draft also shows as an unarchive candidate. Only genuinely
+    // archived items (status != draft) belong in the Unarchive list.
+    ne(storeProducts.status, "draft"),
   );
   const blacklistWhere = and(
     eq(storeProducts.customerId, cid),
