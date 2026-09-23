@@ -6,6 +6,7 @@ import { customers, db, storeProducts } from "@/lib/db";
 import type { Customer } from "@/lib/types";
 import { TriggerSyncButton } from "../trigger-button";
 import { PendingList, type ListMode } from "./pending-list";
+import { BlacklistAdd } from "./blacklist-add";
 
 export const dynamic = "force-dynamic";
 
@@ -234,6 +235,8 @@ export default async function PendingPage({
           <TriggerSyncButton customerId={cid} />
         </section>
       )}
+
+      {view === "blacklist" && <BlacklistAdd customerId={cid} />}
 
       {products.length === 0 ? (
         <div className="rounded-xl border border-slate-800 px-4 py-12 text-center text-slate-500">
